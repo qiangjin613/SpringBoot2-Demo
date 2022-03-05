@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.RestController;
  *      @SpringBootConfiguration
  *      @EnableAutoConfiguration
  *      @ComponentScan("com.springboot.demo")
+ *
+ * MyApplication 即是主启动类，也是主配置类
  */
 @RestController
 @SpringBootApplication(scanBasePackages = "com.springboot.demo")
