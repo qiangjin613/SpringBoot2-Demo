@@ -1,14 +1,22 @@
 package com.springboot.demo;
 
+import com.springboot.demo.bean.Lion;
 import com.springboot.demo.bean.Pet;
+import com.springboot.demo.bean.Tiger;
 import com.springboot.demo.bean.User;
+import com.springboot.demo.conf.MyCar;
 import com.springboot.demo.conf.MyConfig;
+import com.springboot.demo.conf.MyHouse;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Arrays;
 
 /**
  * @SpringBootApplication(scanBasePackages = "com.springboot.demo") 复合注解，
@@ -19,9 +27,21 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * MyApplication 即是主启动类，也是主配置类
  */
+@EnableConfigurationProperties(MyHouse.class)
 @RestController
 @SpringBootApplication(scanBasePackages = "com.springboot.demo")
 public class MyApplication {
+
+    @Autowired
+    MyCar car;
+
+    /**
+     * 对读取配置的类进行测试
+     */
+    @RequestMapping("/mycar")
+    MyCar car() {
+        return car;
+    }
 
     @RequestMapping("/")
     String home() {
@@ -32,7 +52,9 @@ public class MyApplication {
         // 返回 IoC 容器
         ConfigurableApplicationContext iocContext = SpringApplication.run(MyApplication.class, args);
 
-        testConfiguration(iocContext);
+        //testConfiguration(iocContext);
+        //testImport(iocContext);
+        testConditional(iocContext);
     }
 
     /**
@@ -53,5 +75,23 @@ public class MyApplication {
         System.out.println(bean);
         Pet pet1 = bean.pet();
         System.out.println(pet == pet1); /* true */
+    }
+
+    /**
+     * 查看使用 @Import 导入到 IoC 容器中的 Tiger 类
+     */
+    public static void testImport(ApplicationContext iocContext) {
+        String[] beanNames = iocContext.getBeanNamesForType(Tiger.class);
+        System.out.println(Arrays.toString(beanNames));
+    }
+
+    /**
+     * 对 @Conditional 的测试
+     */
+    public static void testConditional(ApplicationContext iocContext) {
+        System.out.println(iocContext.containsBean("fantong"));
+        System.out.println(iocContext.containsBean("lion"));
+        String[] beanNames2 = iocContext.getBeanNamesForType(Lion.class);
+        System.out.println(Arrays.toString(beanNames2));
     }
 }

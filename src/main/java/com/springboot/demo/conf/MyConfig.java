@@ -61,6 +61,7 @@ public class MyConfig {
      */
     @Bean("fantong")
     public Pet pet() {
+        System.out.println("@Configuration 中的 Bean 注入");
         return new Pet("fantong");
     }
 }
