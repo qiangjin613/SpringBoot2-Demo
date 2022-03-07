@@ -198,7 +198,130 @@
     }
     ```
 
-    
+## 二、SpringBoot 启动流程
 
+> Version：SpringBoot 2.6.4
 
+SpringApplication.run(PxksStarter.class, args)
 
+	|-- 使用构造器创建 SpringApplication
+   
+		|-- 推断 webApplicationType 类型，SERVLET
+      
+		|-- 查找 bootstrapRegistryInitializers（List）初始启动引导器列表
+      
+			|-- getSpringFactoriesInstances(Class<T> type) 获取初始化器
+         
+				|-- 使用 SpringFactoriesLoader.loadFactoryNames() 在所有的 META-INF/spring.factories 中查找 bootstrapRegistryInitializers
+            
+				|-- 在 createSpringFactoriesInstances() 中使用上一步查出来的全类名列表使用 Clss.forName() 逐一获取对应的 Class 对象
+            
+				|-- 使用 AnnotationAwareOrderComparator.sort() 对这些组件进行排序（底层使用了 List.sort()）
+            
+		|-- 查找 initializers（List）初始化器列表
+      
+			|-- getSpringFactoriesInstances(Class<T> type) 初始化器列表
+         
+		|-- 查找 listeners（List）监听器列表
+      
+			|-- getSpringFactoriesInstances(Class<T> type) 获取监听器
+         
+		|-- 推断 mainApplicationClass 类型，class cn.zjcdjk.fsws.pxks.start.PxksStarter
+      
+			|-- 使用 deduceMainApplicationClass() 推断主应用程序的类型：就是遍历其中所包含 main 方法的类去查找主运行类
+         
+	|-- 调用 SpringApplication 实例的 run() 运行 SpringApplication
+   
+		|-- 标记应用的启动时间
+      
+		|-- 创建引导上下文 bootstrapContext
+      
+			|-- createBootstrapContext() 中遍历 bootstrapRegistryInitializers，执行 intitialize() 来完成对引导启动器上下文环境设置
+         
+		|-- configureHeadlessProperty() 配置 headless 模式：java.awt.headless（自立更生模式）
+      
+		|-- 获取 SpringApplicationRunListeners 实例 listeners（运行监听器，与创建阶段的不一样）：为了方便所有 Listener 进行事件感知
+      
+			|-- getRunListeners()
+         
+				|-- getSpringFactoriesInstances() 获取运行监听器
+            
+		|-- 遍历 SpringApplicationRunListener 调用 starting 方法：相当于通知所有感兴趣 系统正在启动过程的人，项目正在启动中：listeners.starting(bootstrapContext, this.mainApplicationClass)
+      
+		|-- try {
+      
+		|-- 保存命令行参数 applicationArguments
+      
+		|-- 准备环境信息 environment = prepareEnvironment(listeners, bootstrapContext, applicationArguments);
+      
+			|-- 返回或者创建基础环境信息对象：getOrCreateEnvironment()
+         
+				|-- 通过 webApplicationType switch-case 创建一个 ApplicationServletEnvironment 实例
+            
+			|-- 配置环境信息对象：configureEnvironment(environment, applicationArguments.getSourceArgs())
+         
+				|-- 给 environment 设置类型转换器：ConversionService
+            
+				|-- 加载外部的配置源：configurePropertySources()，相当于加载系统的所有配置信息
+            
+			|-- 绑定环境信息
+         
+			|-- （运行监听器）listeners 调用 environmentPrepared() 通知所有的运行监听器当前环境准备完成
+         
+		|-- configureIgnoreBeanInfo() 配置需要忽略的环境信息
+      
+		|-- printBanner() 打印 Banner
+      
+		|-- 创建 IoC 容器：context = createApplicationContext()
+      
+			|-- 根据 webApplicationType 当前项目类型创建容器类型：这里是 AnnotationConfigServletWebServerApplicationContext 的实例
+         
+		|-- 给容器设置 applicationStartup 信息
+      
+		|-- 准备 IoC 容器信息：prepareContext(bootstrapContext, context, environment, listeners, applicationArguments, printedBanner)
+      
+			|-- 保存环境信息：context.setEnvironment(environment)
+         
+			|-- IoC 容器的后置处理流程：postProcessApplicationContext(context)
+         
+				|-- ...
+            
+			|-- 应用初始化器：applyInitializers(context)
+         
+				|-- 使用准备环境中找到的 initializers 对 IoC 容器进行扩展初始化：for-each -> initializer.initialize(context)
+            
+			|-- 调用 listeners.contextPrepared(context) 通知所有的 listener（EventPublishingRunListener） 调用 contextPrepared() 通知 IoC 容器的上下文环境已经准备好了
+         
+			|-- 关闭 bootstrapContext：bootstrapContext.close(context)
+         
+			|-- 获取 beanFactory：ConfigurableListableBeanFactory beanFactory = context.getBeanFactory()
+         
+			|-- 将命令行参数、Banner以组件的形式注册到 IoC 容器中：beanFactory.registerSingleton("springApplicationArguments", applicationArguments)、beanFactory.registerSingleton("springBootBanner", printedBanner)
+         
+			|-- （运行监听器）listeners 通知所有的运行监听器 IoC 容器准备完成：listeners.contextLoaded(context)
+         
+		|-- 刷新 IoC 容器：refreshContext(context)
+      
+			|-- 里面有 IoC 容器经典的初始化代码：org.springframework.context.support.AbstractApplicationContext#refresh 创建容器中的所有组件
+         
+		|-- 容器刷新完成后工作：afterRefresh(context, applicationArguments)：在当前版本啥也没干
+      
+		|-- 计算应用的启动时间，并打印
+      
+		|-- （运行监听器）listeners 通知所有的运行监听器应用启动完成：listeners.started(context, timeTakenToStartup)
+      
+		|-- 调用所有 runners：callRunners(context, applicationArguments)
+      
+			|-- 在 IoC 容器中根据 Bean的类型获取所有的 ApplicationRunner、CommandLineRunner 的 runner
+         
+			|-- 对上述的 runner 进行排序：AnnotationAwareOrderComparator.sort(runners)（根据 @Order 注解进行排序）
+         
+			|-- 遍历所有的 runner，调用 run()
+         
+		|-- catch { 如果抛出异常：对所有的 listeners 调用 listeners.failed(context, exception)，在 finally 中关闭 监听器 }
+      
+		|-- try {
+      
+		|-- （运行监听器）listeners 通知所有的运行监听器启动：listeners.ready(context, timeTakenToReady)
+      
+		|-- catch { 如果抛出异常：对所有的 listeners 调用 listeners.failed(context, exception)，在 finally 中关闭 监听器 }
